@@ -1,0 +1,230 @@
+version: '3.9'
+
+services:
+  # ===========================================
+  # CORE INFRASTRUCTURE
+  # ===========================================
+  agent-brain:
+    image: agent-brain:latest
+    container_name: maxx-agent-brain
+    ports:
+      - "3030:3030"
+    volumes:
+      - ./agent-brain-data:/data
+      - ./config/agent_brain:/config
+    environment:
+      - AGENT_BRAIN_DATA_DIR=/data
+      - AGENT_BRAIN_CONFIG_DIR=/config
+      - LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3030/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - maxx-network
+
+  # ===========================================
+  # AGENT RUNNERS
+  # ===========================================
+  claude-code-runner:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.claude-runner
+    container_name: maxx-claude-runner
+    volumes:
+      - .:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ~/.claude:/home/node/.claude
+    environment:
+      - AGENT_BRAIN_URL=http://agent-brain:3030
+      - PROJECT_KEY=${AGENT_BRAIN_PROJECT_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - MESHY_API_KEY=${MESHY_API_KEY}
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY}
+    depends_on:
+      agent-brain:
+        condition: service_healthy
+    networks:
+      - maxx-network
+    profiles:
+      - agents
+
+  codex-runner:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.codex-runner
+    container_name: maxx-codex-runner
+    volumes:
+      - .:/workspace
+    environment:
+      - AGENT_BRAIN_URL=http://agent-brain:3030
+      - PROJECT_KEY=${AGENT_BRAIN_PROJECT_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    depends_on:
+      agent-brain:
+        condition: service_healthy
+    networks:
+      - maxx-network
+    profiles:
+      - agents
+
+  # ===========================================
+  # 3D GENERATION WORKERS
+  # ===========================================
+  meshy-worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.meshy-worker
+    container_name: maxx-meshy-worker
+    environment:
+      - AGENT_BRAIN_URL=http://agent-brain:3030
+      - PROJECT_KEY=${AGENT_BRAIN_PROJECT_KEY}
+      - MESHY_API_KEY=${MESHY_API_KEY}
+      - MESHY_BASE_URL=${MESHY_BASE_URL}
+      - MESHY_RATE_LIMIT_RPM=${MESHY_RATE_LIMIT_RPM}
+      - MESHY_MAX_CONCURRENT=${MESHY_MAX_CONCURRENT}
+      - OUTPUT_DIR=/workspace/assets/3d/generated
+    volumes:
+      - ./assets:/workspace/assets
+      - ./tools/python:/workspace/tools/python
+    depends_on:
+      agent-brain:
+        condition: service_healthy
+    networks:
+      - maxx-network
+    profiles:
+      - workers
+
+  minimax-worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.minimax-worker
+    container_name: maxx-minimax-worker
+    environment:
+      - AGENT_BRAIN_URL=http://agent-brain:3030
+      - PROJECT_KEY=${AGENT_BRAIN_PROJECT_KEY}
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY}
+      - MINIMAX_BASE_URL=${MINIMAX_BASE_URL}
+      - OUTPUT_DIR=/workspace/assets/video/generated
+    volumes:
+      - ./assets:/workspace/assets
+      - ./tools/python:/workspace/tools/python
+    depends_on:
+      agent-brain:
+        condition: service_healthy
+    networks:
+      - maxx-network
+    profiles:
+      - workers
+
+  # ===========================================
+  # UNITY BUILDER
+  # ===========================================
+  unity-builder:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.unity-builder
+    container_name: maxx-unity-builder
+    volumes:
+      - ./src:/project
+      - ./builds:/builds
+      - ./logs/builds:/logs
+    environment:
+      - UNITY_VERSION=${UNITY_VERSION}
+      - UNITY_LICENSE=${UNITY_LICENSE}
+      - BUILD_TARGET=StandaloneWindows64
+      - BUILD_OUTPUT_PATH=/builds
+    networks:
+      - maxx-network
+    profiles:
+      - builders
+
+  # ===========================================
+  # DATABASE SERVICES (Optional)
+  # ===========================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: maxx-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infrastructure/docker/init-db:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - maxx-network
+    profiles:
+      - database
+
+  redis:
+    image: redis:7-alpine
+    container_name: maxx-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - maxx-network
+    profiles:
+      - database
+
+  # ===========================================
+  # MONITORING (Optional)
+  # ===========================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: maxx-prometheus
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - maxx-network
+    profiles:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: maxx-grafana
+    volumes:
+      - ./infrastructure/monitoring/grafana:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+    networks:
+      - maxx-network
+    profiles:
+      - monitoring
+
+volumes:
+  agent-brain-data:
+  postgres-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  maxx-network:
+    driver: bridge
+    name: maxx-network
