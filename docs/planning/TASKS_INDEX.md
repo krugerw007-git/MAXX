@@ -4,15 +4,15 @@
 | ID | Task | Status | % | Assignee | Docs | Tests | PR | Notes |
 |----|------|--------|---|----------|------|-------|-----|-------|
 | T001 | Create PROJECT_MANIFEST.md | ✅ | 100% | Claude | ✅ | N/A | N/A | This file |
-| T002 | Initialize GitHub repo (krugerw007-git/MAXX) | 🔄 | 0% | Codex | ⏳ | ⏳ | ⏳ | |
-| T003 | Setup GitHub Actions CI/CD | 📋 | 0% | Codex | ⏳ | ⏳ | ⏳ | |
+| T002 | Initialize GitHub repo (krugerw007-git/MAXX) | ✅ | 100% | Codex | ✅ | ✅ | ✅ | https://github.com/krugerw007-git/MAXX |
+| T003 | Setup GitHub Actions CI/CD | 🔄 | 10% | Codex | ⏳ | ⏳ | ⏳ | In progress |
 | T004 | Setup Docker infrastructure | 📋 | 0% | Codex | ⏳ | ⏳ | ⏳ | |
 | T005 | Setup Agent Brain integration | 📋 | 0% | Claude | ⏳ | ⏳ | ⏳ | |
 | T006 | Setup Meshy AI integration | 📋 | 0% | Meshy | ⏳ | ⏳ | ⏳ | |
 | T007 | Setup Minimax API integration | 📋 | 0% | Minimax | ⏳ | ⏳ | ⏳ | |
 | T008 | Setup Agent Brain MCP for Claude Code | 📋 | 0% | Claude | ⏳ | ⏳ | ⏳ | |
 | T009 | Setup Codex Agent Brain integration (curl) | 📋 | 0% | Codex | ⏳ | ⏳ | ⏳ | |
-| T010 | Create project directory structure | ✅ | 100% | Claude | 🔄 | N/A | N/A | In progress |
+| T010 | Create project directory structure | ✅ | 100% | Claude | ✅ | N/A | N/A | Done |
 
 ## SPRINT 002: UNITY PROJECT FOUNDATION
 | ID | Task | Status | % | Assignee | Docs | Tests | PR | Notes |

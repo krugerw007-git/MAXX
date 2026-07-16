@@ -1,0 +1,32 @@
+# Agent Brain Dockerfile
+FROM node:20-alpine AS base
+
+# Install dependencies
+RUN apk add --no-cache curl
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install production dependencies
+RUN npm ci --only=production
+
+# Copy source
+COPY . .
+
+# Create non-root user
+RUN addgroup -g 1000 -S appgroup && \
+    adduser -u 1000 -S appuser -G appgroup
+
+# Create data directory
+RUN mkdir -p /data && chown -R appuser:appgroup /data
+
+USER appuser
+
+EXPOSE 3030
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=5 \
+  CMD curl -f http://localhost:3030/health || exit 1
+
+CMD ["node", "server.js"]

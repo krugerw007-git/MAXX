@@ -1,0 +1,53 @@
+# Unity Builder Dockerfile
+# Based on Unity's official Docker images
+FROM ubuntu:22.04 AS base
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV UNITY_VERSION=2022.3.0f1
+
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    ca-certificates \
+    gnupg \
+    software-properties-common \
+    libglib2.0-0 \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Unity
+RUN curl -fSL "https://download.unity3d.com/download_unity/${UNITY_VERSION}/LinuxEditorInstaller/Unity-${UNITY_VERSION}.tar.gz" -o /tmp/unity.tar.gz && \
+    tar -xzf /tmp/unity.tar.gz -C /opt && \
+    mv /opt/Unity-${UNITY_VERSION} /opt/unity && \
+    rm /tmp/unity.tar.gz && \
+    ln -s /opt/unity/Editor/Unity /usr/local/bin/unity
+
+# Install .NET SDK for building
+RUN wget https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb && \
+    dpkg -i packages-microsoft-prod.deb && \
+    rm packages-microsoft-prod.deb && \
+    apt-get update && \
+    apt-get install -y dotnet-sdk-8.0 && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /project
+
+# Copy entrypoint
+COPY infrastructure/docker/entrypoint-unity.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["unity", "-batchmode", "-quit", "-logfile", "-"]
